@@ -3,11 +3,11 @@ import {supabase} from '../../lib/helper/supabase_client'
 import validator from 'validator';
 import './LoginPopup.css';
 
-export const LoginScreen = () => {
+export const LoginScreen = ({setToken}) => {
     const [formData, setFormData] = useState({
         fullName: "",
         email: "",
-        password: "",validFullName: true, validEmail: true, validPassword: true,validForm: true
+        password: "",agreeTerms:false,validFullName: true, validEmail: true, validPassword: true,validForm: true
       });
 
      
@@ -16,6 +16,11 @@ export const LoginScreen = () => {
       const [success, setSuccess] = useState('');
       const [wait,setWait] = useState('');
       const [autScreen, setAutScreen] = useState('sign-in');
+
+    //   let supa_token = sessionStorage.getItem('token','');
+    //   const [token, setToken] = useState(supa_token ? JSON.parse(supa_token) : false);
+
+    // console.log(token);
     
       const validatePassword = (password) => {
         const minLength = 8;
@@ -44,7 +49,12 @@ export const LoginScreen = () => {
       };
     
       const handleChange = (e) => {
-        handleFormData(e.target.name,e.target.value);
+        if(e.target.name === "agreeTerms"){
+            handleFormData(e.target.name,e.target.checked);
+        }else{
+            handleFormData(e.target.name,e.target.value);
+        }
+        
       }
 
       const handleFormData = (name, value) => {
@@ -54,87 +64,130 @@ export const LoginScreen = () => {
             return {...prevFormData,[name]:value}
         });
 
-        console.log(formData);
-        console.log(name, value);
       }
     
       async function handleSubmit(e) {
         e.preventDefault();
         setError('');
         setWait('');
+        setSuccess("")
 
         setFormData((prevFormData) =>{
             return {...prevFormData, validFullName:true, validEmail: true,validPassword: true, validForm:true}
           });
+        
+        let validForm = true;
 
         try{
 
-            if(formData.email === "" || formData.password === "" || formData.fullName){
-                if(autScreen === 'sign-up'){
-                    if(formData.fullName === "")
-                        handleFormData('validFullName', false);
+            
+            if(autScreen === 'sign-up'){
+                if(formData.fullName === ""){
+                    handleFormData('validFullName', false);
+                    validForm = false;
+                }
+            }
+
+            if(autScreen === 'sign-in' || autScreen === 'sign-up'){
+                if(formData.email === ""){
+                    handleFormData('validEmail', false);
+                    validForm = false;
                 }
 
-                if(autScreen === 'sign-in' || autScreen === 'sign-up'){
-                    if(formData.email === "")
-                        handleFormData('validEmail', false);
+                if(formData.password === ""){
+                    handleFormData('validPassword', false);
+                    validForm = false;
+                }               
+            }            
 
-                    if(formData.password === "")
-                        handleFormData('validPassword', false);
-
-                    
-
-                }            
-
+            console.log(autScreen)                
+            
+            if(!validForm){
                 setError("Please enter the required fields");
-                handleFormData('validForm', false);
                 return false;
             }
 
-
-          if(formData.validForm){
-            if (!validator.isEmail(formData.email)) {
-              setError('Please enter a valid email address.');
-              handleFormData('validEmail', false);
-              handleFormData('validForm', false);
-              return false;
+            if(validForm){
+                if (!validator.isEmail(formData.email)) {
+                setError('Please enter a valid email address.');
+                handleFormData('validEmail', false);
+                //handleFormData('validForm', false);
+                validForm = false;
+                return false;
+                }
             }
-        }
 
-        if(formData.validForm){    
-            const passwordError = validatePassword(formData.password);
-            if (passwordError) {
-              setError(passwordError);
-              handleFormData('validPassword', false);
-              handleFormData('validForm', false);
-              return false;
+            if(validForm){    
+                const passwordError = validatePassword(formData.password);
+                if (passwordError) {
+                    setError(passwordError);
+                    handleFormData('validPassword', false);
+                    //handleFormData('validForm', false);
+                    validForm = false;
+                    return false;
+                }
             }
-          }
 
-          console.log(formData.validForm);
+            if(autScreen === 'sign-up'){
+                if(!formData.agreeTerms){
+                    setError('Please agree terms and conditions.');
+                    handleFormData('validAgreeTerms', false);
+                    validForm = false;
+                    return false;
+                }
+            }
 
-          if(!formData.validForm)
-            return false;
-    
-          setWait('Please Wait!');
-          
-        //   const response = await supabase.auth.signUp(
-        //     {
-        //       email: formData.email,
-        //       password: formData.password,
-        //       option: {
-        //         data: {
-        //           first_name: formData.fullName
-        //         }
-        //       }
-        //     }
-        //   )
-    
-        //   setWait('');
-    
-        //   if (response.error) throw response.error;
-    
-          setSuccess('Signup successful! Please check your email to confirm your account.');
+            console.log("Valid form",validForm);
+
+            if(!validForm)
+                return false;
+            
+            setError("");
+
+            setWait('Please Wait!');
+
+            if(autScreen === 'sign-in'){
+                const response = await supabase.auth.signInWithPassword({
+                    email: formData.email,
+                    password: formData.password,
+                });
+
+                if (response.error) {
+                    setWait('');
+                    throw response.error
+                }else{
+                    setWait('');
+                    setSuccess('Signup successfully logged in.');
+                    let response_data = response.data
+                    setToken(response_data);
+                }
+
+            }else{
+                const response = await supabase.auth.signUp(
+                    {
+                        email: formData.email,
+                        password: formData.password,
+                        option: {
+                            data: {
+                                first_name: 'Salim',
+                                last_name: 'Shaikh',
+                                // display_name: formData.fullName,
+                            }
+                        }
+                    }
+                )
+
+                if (response.error) {
+                    setWait('');
+                    throw response.error
+                }else{
+                    setWait('');
+                    setSuccess('Signup successful! Please check your email to confirm your account.');  
+                }
+
+                
+            }   
+            
     
         } catch (error){
           if (error.message.includes('Email rate limit exceeded')) {
@@ -175,14 +228,13 @@ export const LoginScreen = () => {
                     <input type="text" placeholder="Email" name="email" onChange={handleChange} 
                     className={`email-field ${formData.validEmail === true ? 'valid' : 'invalid'}`} />
 
-                    <input type="password" placeholder="Password" name="password" onChange={handleChange}                    
+                    <input type="text" placeholder="Password" name="password" onChange={handleChange}                    
                     className={`password-field ${formData.validPassword === true ? 'valid' : 'invalid'}`} />
                 </div>
 
                 <button>{autScreen === "sign-up" ? "Create account" : "Login"}</button>
                 {autScreen === "sign-up" ? <div className="login-popup-condition">
-                <input type="checkbox" required />
-                <p>By Continuing, i agree to the terms of use & privacy policy</p>
+                <p className="terms-condition"><label><input type="checkbox" name="agreeTerms" value='yes' onChange={handleChange}  />By Continuing, i agree to the terms of use & privacy policy</label></p>
                 </div> : <></>}
 
                 
